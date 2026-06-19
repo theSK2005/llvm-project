@@ -25,7 +25,7 @@ jobs:
     # to rebase.  We want to ignore these pull requests to avoid excessive
     # notifications.
     if: >
-      github.repository == 'ROCm/llvm-project' &&
+      github.repository == 'theSK2005/llvm-project' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.commits < 10
     steps:
