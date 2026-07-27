@@ -88,8 +88,17 @@ enum ArchFeatureKind : uint32_t {
   // VI SGPR initialization bug requiring a fixed SGPR allocation size.
   FEATURE_SGPR_INIT_BUG = 1 << 11,
 
+  // Register file provides 1536 VGPRs in wave32 mode.
+  FEATURE_1536_VGPRS = 1 << 12,
+
+  // Register file provides 1024 addressable architectural VGPRs in wave32 mode.
+  FEATURE_1024_ADDRESSABLE_VGPRS = 1 << 13,
+
+  // Architecture has AGPRs (mai-insts).
+  FEATURE_AGPRS = 1 << 14,
+
   // AGPRs share a unified register file with VGPRs (gfx90a-insts).
-  FEATURE_AGPRS_UNIFIED_FILE = 1 << 12
+  FEATURE_AGPRS_UNIFIED_FILE = 1 << 15
 };
 
 enum FeatureError : uint32_t {
@@ -164,11 +173,41 @@ LLVM_ABI unsigned getAddressableNumSGPRs(Triple::SubArchType SubArch);
 LLVM_ABI unsigned getSGPRAllocGranule(GPUKind AK);
 LLVM_ABI unsigned getSGPRAllocGranule(Triple::SubArchType SubArch);
 
+enum { MAX_DYNAMIC_VGPR_BLOCKS = 8 };
+
 LLVM_ABI unsigned getEUsPerCU(GPUKind AK, bool CuMode);
 LLVM_ABI unsigned getEUsPerCU(Triple::SubArchType SubArch, bool CuMode);
 
 LLVM_ABI unsigned getMaxWavesPerEU(GPUKind AK);
 LLVM_ABI unsigned getMaxWavesPerEU(Triple::SubArchType SubArch);
+
+LLVM_ABI unsigned getTotalNumVGPRs(GPUKind AK, bool Wave32);
+LLVM_ABI unsigned getTotalNumVGPRs(Triple::SubArchType SubArch, bool Wave32);
+
+LLVM_ABI unsigned getVGPRAllocGranule(GPUKind AK, unsigned DynamicVGPRBlockSize,
+                                      bool Wave32);
+LLVM_ABI unsigned getVGPRAllocGranule(Triple::SubArchType SubArch,
+                                      unsigned DynamicVGPRBlockSize,
+                                      bool Wave32);
+
+LLVM_ABI unsigned getAddressableNumArchVGPRs(GPUKind AK, bool Wave32);
+LLVM_ABI unsigned getAddressableNumArchVGPRs(Triple::SubArchType SubArch,
+                                             bool Wave32);
+
+LLVM_ABI unsigned
+getAddressableNumVGPRs(GPUKind AK, unsigned DynamicVGPRBlockSize, bool Wave32);
+LLVM_ABI unsigned getAddressableNumVGPRs(Triple::SubArchType SubArch,
+                                         unsigned DynamicVGPRBlockSize,
+                                         bool Wave32);
+
+LLVM_ABI bool hasAGPRs(GPUKind AK);
+LLVM_ABI bool hasAGPRs(Triple::SubArchType SubArch);
+
+LLVM_ABI bool hasUnifiedAGPRVGPRFile(GPUKind AK);
+LLVM_ABI bool hasUnifiedAGPRVGPRFile(Triple::SubArchType SubArch);
+
+LLVM_ABI unsigned getAddressableNumAGPRs(GPUKind AK);
+LLVM_ABI unsigned getAddressableNumAGPRs(Triple::SubArchType SubArch);
 
 /// Fills Features map with default values for given target GPU.
 /// \p Features contains overriding target features and this function returns

@@ -2907,6 +2907,119 @@ TEST(TargetParserTest, testAMDGPUgetMaxWavesPerEU) {
   EXPECT_EQ(AMDGPU::getMaxWavesPerEU(AMDGPU::GK_GFX1100), 16u);
 }
 
+TEST(TargetParserTest, testAMDGPUgetTotalNumVGPRs) {
+  // GFX90A -> 512 and pre-GFX10 -> 256, both independent of wavefront size; the
+  // 1536-VGPR file (GFX11.0.0) -> 1536/768; default GFX10+ -> 1024/512. Second
+  // arg is the wave32 flag.
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch90A, true), 512u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch90A, false), 512u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch600, true), 256u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch1100, true), 1536u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch1100, false), 768u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch1030, true), 1024u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(Triple::AMDGPUSubArch1030, false), 512u);
+
+  // The GPUKind overloads resolve to the same values.
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(AMDGPU::GK_GFX90A, true), 512u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(AMDGPU::GK_GFX600, true), 256u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(AMDGPU::GK_GFX1100, true), 1536u);
+  EXPECT_EQ(AMDGPU::getTotalNumVGPRs(AMDGPU::GK_GFX1030, true), 1024u);
+}
+
+TEST(TargetParserTest, testAMDGPUgetVGPRAllocGranule) {
+  // GFX90A -> 8 regardless of other inputs; a nonzero dynamic block size is
+  // returned verbatim; 1536-VGPR file -> 24/12; GFX10.3 -> 16/8; GFX10 -> 8/4.
+  // Args are (kind, dynamic block size, wave32).
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch90A, 0, true), 8u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1010, 16, true),
+            16u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1100, 0, true),
+            24u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1100, 0, false),
+            12u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1030, 0, true),
+            16u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1010, 0, true),
+            8u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(Triple::AMDGPUSubArch1010, 0, false),
+            4u);
+
+  // The GPUKind overloads resolve to the same values.
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(AMDGPU::GK_GFX90A, 0, true), 8u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(AMDGPU::GK_GFX1100, 0, true), 24u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(AMDGPU::GK_GFX1030, 0, true), 16u);
+  EXPECT_EQ(AMDGPU::getVGPRAllocGranule(AMDGPU::GK_GFX1010, 0, true), 8u);
+}
+
+TEST(TargetParserTest, testAMDGPUgetAddressableNumVGPRs) {
+  // getAddressableNumArchVGPRs: the 1024-addressable file (GFX12.5) ->
+  // 1024/512, everything else -> 256. Second arg is the wave32 flag.
+  EXPECT_EQ(AMDGPU::getAddressableNumArchVGPRs(Triple::AMDGPUSubArch1250, true),
+            1024u);
+  EXPECT_EQ(
+      AMDGPU::getAddressableNumArchVGPRs(Triple::AMDGPUSubArch1250, false),
+      512u);
+  EXPECT_EQ(AMDGPU::getAddressableNumArchVGPRs(Triple::AMDGPUSubArch1030, true),
+            256u);
+
+  // getAddressableNumVGPRs: GFX90A -> 512; static mode defers to the arch VGPR
+  // count; dynamic mode -> MAX_DYNAMIC_VGPR_BLOCKS * granule. Args are (kind,
+  // dynamic block size, wave32).
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(Triple::AMDGPUSubArch90A, 0, true),
+            512u);
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(Triple::AMDGPUSubArch1250, 0, true),
+            1024u);
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(Triple::AMDGPUSubArch1030, 0, true),
+            256u);
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(Triple::AMDGPUSubArch1200, 16, true),
+            AMDGPU::MAX_DYNAMIC_VGPR_BLOCKS * 16u);
+
+  // The GPUKind overloads resolve to the same values.
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(AMDGPU::GK_GFX90A, 0, true), 512u);
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(AMDGPU::GK_GFX1250, 0, true), 1024u);
+  EXPECT_EQ(AMDGPU::getAddressableNumVGPRs(AMDGPU::GK_GFX1030, 0, true), 256u);
+}
+
+TEST(TargetParserTest, testAMDGPUAGPRs) {
+  // hasAGPRs (mai-insts): gfx908 and the whole GFX90A family have AGPRs;
+  // everything else does not.
+  EXPECT_TRUE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch908));
+  EXPECT_TRUE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch90A));
+  EXPECT_TRUE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch942));
+  EXPECT_TRUE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch950));
+  EXPECT_TRUE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch9_4));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch900));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch906));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch1010));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch1100));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(Triple::AMDGPUSubArch1250));
+
+  // hasUnifiedAGPRVGPRFile (gfx90a-insts): the GFX90A family shares a unified
+  // VGPR/AGPR file, but gfx908 has a separate AGPR file.
+  EXPECT_FALSE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch908));
+  EXPECT_TRUE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch90A));
+  EXPECT_TRUE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch942));
+  EXPECT_TRUE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch950));
+  EXPECT_TRUE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch9_4));
+  EXPECT_FALSE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch900));
+  EXPECT_FALSE(AMDGPU::hasUnifiedAGPRVGPRFile(Triple::AMDGPUSubArch1250));
+
+  // getAddressableNumAGPRs: 256 for archs with AGPRs, 0 otherwise.
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(Triple::AMDGPUSubArch908), 256u);
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(Triple::AMDGPUSubArch90A), 256u);
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(Triple::AMDGPUSubArch900), 0u);
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(Triple::AMDGPUSubArch1100), 0u);
+
+  // The GPUKind overloads resolve to the same values.
+  EXPECT_TRUE(AMDGPU::hasAGPRs(AMDGPU::GK_GFX908));
+  EXPECT_TRUE(AMDGPU::hasAGPRs(AMDGPU::GK_GFX90A));
+  EXPECT_FALSE(AMDGPU::hasAGPRs(AMDGPU::GK_GFX900));
+  EXPECT_FALSE(AMDGPU::hasUnifiedAGPRVGPRFile(AMDGPU::GK_GFX908));
+  EXPECT_TRUE(AMDGPU::hasUnifiedAGPRVGPRFile(AMDGPU::GK_GFX90A));
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(AMDGPU::GK_GFX908), 256u);
+  EXPECT_EQ(AMDGPU::getAddressableNumAGPRs(AMDGPU::GK_GFX900), 0u);
+}
+
 TEST(TargetParserTest, testAMDGPUParseTargetIDString) {
   using AMDGPU::TargetID;
   using AMDGPU::TargetIDSetting;

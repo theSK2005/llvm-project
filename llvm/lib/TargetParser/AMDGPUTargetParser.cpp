@@ -483,6 +483,130 @@ unsigned AMDGPU::getMaxWavesPerEU(Triple::SubArchType SubArch) {
   return hasGFX10_3Insts(Version) ? 16 : 20;
 }
 
+unsigned AMDGPU::getTotalNumVGPRs(GPUKind AK, bool Wave32) {
+  unsigned Features = getArchAttrAMDGCN(AK);
+  if (Features & FEATURE_AGPRS_UNIFIED_FILE)
+    return 512;
+  IsaVersion Version = getIsaVersion(getSubArch(AK));
+  if (Version.Major < 10)
+    return 256;
+  if (Features & FEATURE_1536_VGPRS)
+    return Wave32 ? 1536 : 768;
+  return Wave32 ? 1024 : 512;
+}
+
+unsigned AMDGPU::getTotalNumVGPRs(Triple::SubArchType SubArch, bool Wave32) {
+  unsigned Features = getArchAttrAMDGCN(SubArch);
+  if (Features & FEATURE_AGPRS_UNIFIED_FILE)
+    return 512;
+  IsaVersion Version = getIsaVersion(SubArch);
+  if (Version.Major < 10)
+    return 256;
+  if (Features & FEATURE_1536_VGPRS)
+    return Wave32 ? 1536 : 768;
+  return Wave32 ? 1024 : 512;
+}
+
+unsigned AMDGPU::getVGPRAllocGranule(GPUKind AK, unsigned DynamicVGPRBlockSize,
+                                     bool Wave32) {
+  unsigned Features = getArchAttrAMDGCN(AK);
+  if (Features & FEATURE_AGPRS_UNIFIED_FILE)
+    return 8;
+
+  if (DynamicVGPRBlockSize != 0)
+    return DynamicVGPRBlockSize;
+
+  if (Features & FEATURE_1536_VGPRS)
+    return Wave32 ? 24 : 12;
+
+  if (hasGFX10_3Insts(getIsaVersion(getSubArch(AK))))
+    return Wave32 ? 16 : 8;
+
+  return Wave32 ? 8 : 4;
+}
+
+unsigned AMDGPU::getVGPRAllocGranule(Triple::SubArchType SubArch,
+                                     unsigned DynamicVGPRBlockSize,
+                                     bool Wave32) {
+  unsigned Features = getArchAttrAMDGCN(SubArch);
+  if (Features & FEATURE_AGPRS_UNIFIED_FILE)
+    return 8;
+
+  if (DynamicVGPRBlockSize != 0)
+    return DynamicVGPRBlockSize;
+
+  if (Features & FEATURE_1536_VGPRS)
+    return Wave32 ? 24 : 12;
+
+  if (hasGFX10_3Insts(getIsaVersion(SubArch)))
+    return Wave32 ? 16 : 8;
+
+  return Wave32 ? 8 : 4;
+}
+
+unsigned AMDGPU::getAddressableNumArchVGPRs(GPUKind AK, bool Wave32) {
+  if (getArchAttrAMDGCN(AK) & FEATURE_1024_ADDRESSABLE_VGPRS)
+    return Wave32 ? 1024 : 512;
+  return 256;
+}
+
+unsigned AMDGPU::getAddressableNumArchVGPRs(Triple::SubArchType SubArch,
+                                            bool Wave32) {
+  if (getArchAttrAMDGCN(SubArch) & FEATURE_1024_ADDRESSABLE_VGPRS)
+    return Wave32 ? 1024 : 512;
+  return 256;
+}
+
+unsigned AMDGPU::getAddressableNumVGPRs(GPUKind AK,
+                                        unsigned DynamicVGPRBlockSize,
+                                        bool Wave32) {
+  if (getArchAttrAMDGCN(AK) & FEATURE_AGPRS_UNIFIED_FILE)
+    return 512;
+  if (DynamicVGPRBlockSize != 0) {
+    // On GFX12 we can allocate at most MAX_DYNAMIC_VGPR_BLOCKS blocks of VGPRs.
+    return MAX_DYNAMIC_VGPR_BLOCKS *
+           getVGPRAllocGranule(AK, DynamicVGPRBlockSize, Wave32);
+  }
+  return getAddressableNumArchVGPRs(AK, Wave32);
+}
+
+unsigned AMDGPU::getAddressableNumVGPRs(Triple::SubArchType SubArch,
+                                        unsigned DynamicVGPRBlockSize,
+                                        bool Wave32) {
+  if (getArchAttrAMDGCN(SubArch) & FEATURE_AGPRS_UNIFIED_FILE)
+    return 512;
+  if (DynamicVGPRBlockSize != 0) {
+    // On GFX12 we can allocate at most MAX_DYNAMIC_VGPR_BLOCKS blocks of VGPRs.
+    return MAX_DYNAMIC_VGPR_BLOCKS *
+           getVGPRAllocGranule(SubArch, DynamicVGPRBlockSize, Wave32);
+  }
+  return getAddressableNumArchVGPRs(SubArch, Wave32);
+}
+
+bool AMDGPU::hasAGPRs(GPUKind AK) {
+  return getArchAttrAMDGCN(AK) & FEATURE_AGPRS;
+}
+
+bool AMDGPU::hasAGPRs(Triple::SubArchType SubArch) {
+  return getArchAttrAMDGCN(SubArch) & FEATURE_AGPRS;
+}
+
+bool AMDGPU::hasUnifiedAGPRVGPRFile(GPUKind AK) {
+  return getArchAttrAMDGCN(AK) & FEATURE_AGPRS_UNIFIED_FILE;
+}
+
+bool AMDGPU::hasUnifiedAGPRVGPRFile(Triple::SubArchType SubArch) {
+  return getArchAttrAMDGCN(SubArch) & FEATURE_AGPRS_UNIFIED_FILE;
+}
+
+unsigned AMDGPU::getAddressableNumAGPRs(GPUKind AK) {
+  return hasAGPRs(AK) ? 256 : 0;
+}
+
+unsigned AMDGPU::getAddressableNumAGPRs(Triple::SubArchType SubArch) {
+  return hasAGPRs(SubArch) ? 256 : 0;
+}
+
 StringRef AMDGPU::getCanonicalArchName(const Triple &T, StringRef Arch) {
   assert(T.isAMDGPU());
   auto ProcKind = T.isAMDGCN() ? parseArchAMDGCN(Arch) : parseArchR600(Arch);

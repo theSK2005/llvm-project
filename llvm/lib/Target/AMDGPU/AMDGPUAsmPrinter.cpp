@@ -420,8 +420,11 @@ const AMDGPUMCExpr *createOccupancy(unsigned InitOcc, const MCExpr *NumSGPRs,
                                     unsigned DynamicVGPRBlockSize,
                                     const GCNSubtarget &STM, MCContext &Ctx) {
   unsigned MaxWaves = AMDGPU::getMaxWavesPerEU(STM.getTargetID().getGPUKind());
-  unsigned Granule = IsaInfo::getVGPRAllocGranule(STM, DynamicVGPRBlockSize);
-  unsigned TargetTotalNumVGPRs = IsaInfo::getTotalNumVGPRs(STM);
+  bool Wave32 = STM.getFeatureBits().test(AMDGPU::FeatureWavefrontSize32);
+  unsigned Granule = AMDGPU::getVGPRAllocGranule(STM.getTargetID().getGPUKind(),
+                                                 DynamicVGPRBlockSize, Wave32);
+  unsigned TargetTotalNumVGPRs =
+      AMDGPU::getTotalNumVGPRs(STM.getTargetID().getGPUKind(), Wave32);
 
   // Bake the per-function SGPR budget into the operands so the late-evaluated
   // MCExpr stays arithmetic. The trap reservation in particular is implicit on

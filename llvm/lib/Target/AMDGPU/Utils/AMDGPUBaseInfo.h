@@ -239,14 +239,6 @@ unsigned getNumExtraSGPRs(const MCSubtargetInfo &STI, bool VCCUsed,
 /// register counts.
 unsigned getNumSGPRBlocks(const MCSubtargetInfo &STI, unsigned NumSGPRs);
 
-/// \returns VGPR allocation granularity for given subtarget \p STI.
-///
-/// For subtargets which support it, \p EnableWavefrontSize32 should match
-/// the ENABLE_WAVEFRONT_SIZE32 kernel descriptor field.
-unsigned
-getVGPRAllocGranule(const MCSubtargetInfo &STI, unsigned DynamicVGPRBlockSize,
-                    std::optional<bool> EnableWavefrontSize32 = std::nullopt);
-
 /// \returns VGPR encoding granularity for given subtarget \p STI.
 ///
 /// For subtargets which support it, \p EnableWavefrontSize32 should match
@@ -259,19 +251,9 @@ unsigned getVGPREncodingGranule(
 /// returns the allocation granule for ArchVGPRs.
 unsigned getArchVGPRAllocGranule();
 
-/// \returns Total number of VGPRs for given subtarget \p STI.
-unsigned getTotalNumVGPRs(const MCSubtargetInfo &STI);
-
 /// Maximum number of VGPR blocks that can be allocated in dynamic VGPR mode.
-static constexpr unsigned MaxDynamicVGPRBlocks = 8;
-
-/// \returns Addressable number of architectural VGPRs for a given subtarget \p
-/// STI.
-unsigned getAddressableNumArchVGPRs(const MCSubtargetInfo &STI);
-
-/// \returns Addressable number of VGPRs for given subtarget \p STI.
-unsigned getAddressableNumVGPRs(const MCSubtargetInfo &STI,
-                                unsigned DynamicVGPRBlockSize);
+static constexpr unsigned MaxDynamicVGPRBlocks =
+    AMDGPU::MAX_DYNAMIC_VGPR_BLOCKS;
 
 /// \returns Minimum number of VGPRs that meets given number of waves per
 /// execution unit requirement for given subtarget \p STI.
